@@ -7,11 +7,20 @@ FastAPI or another framework without changing package-manager semantics.
 
 from __future__ import annotations
 
+import html
 import ipaddress
+import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
-from lemonade_store.package_manager import build_catalog
+from lemonade_store.package_manager import (
+    CatalogError,
+    InstallStateError,
+    PackageManager,
+    build_catalog,
+    resolve_selection,
+)
 
 
 @dataclass(frozen=True)
@@ -77,24 +86,48 @@ class AdminApp:
         self.help_center = help_center
         self.policy = policy or AccessPolicy()
 
-    def handle(self, method: str, path: str, *, host: str) -> Response:
+    def handle(self, method: str, path: str, *, host: str, role: str = "owner") -> Response:
         """Handle a minimal internal route."""
         if not self.policy.is_internal_host(host):
             return Response(status=403, body="Forbidden: internal access only")
         if method != "GET":
             return Response(status=405, body="Method not allowed")
-        if path == "/":
-            return Response(status=200, body=self._home())
-        if path == "/packages":
+
+        parsed = urlsplit(path)
+        route = parsed.path
+        query = parse_qs(parsed.query)
+
+        if route == "/":
+            return Response(status=200, body=self._home(role))
+        if route == "/packages":
+            denied = _require_owner_admin(role)
+            if denied is not None:
+                return denied
             return Response(status=200, body=self._packages())
-        if path == "/help":
+        if route == "/packages/plan":
+            denied = _require_owner_admin(role)
+            if denied is not None:
+                return denied
+            return self._package_plan(query)
+        if route == "/packages/status":
+            denied = _require_owner_admin(role)
+            if denied is not None:
+                return denied
+            return self._package_status()
+        if route == "/help":
             return Response(status=200, body=self._help_index())
-        if path.startswith("/help/"):
-            return Response(status=200, body=self.help_center.render(path.rsplit("/", 1)[-1]))
+        if route.startswith("/help/"):
+            return Response(status=200, body=self.help_center.render(route.rsplit("/", 1)[-1]))
         return Response(status=404, body="Not found")
 
-    def _home(self) -> str:
-        return "<h1>Lemonade Admin</h1><p>Internal-only POS/admin shell.</p>"
+    def _home(self, role: str) -> str:
+        return (
+            "<h1>Lemonade Admin</h1>"
+            "<p>Internal-only POS/admin shell.</p>"
+            f"<p>Role: {html.escape(role)}</p>"
+            '<nav><a href="/help">Help Center</a> '
+            '<a href="/packages">Package Wizard</a></nav>'
+        )
 
     def _packages(self) -> str:
         catalog = build_catalog()
@@ -106,13 +139,92 @@ class AdminApp:
             for pkg in catalog.packages.values()
             if pkg.kind == "department"
         )
-        return f"<h1>Package Wizard</h1><h2>Profiles</h2><ul>{profiles}</ul><h2>Departments</h2><ul>{departments}</ul>"
+        return (
+            "<h1>Package Wizard</h1>"
+            "<p>Owner/admin only. Attendants can use POS and Help Center pages, "
+            "but cannot install, disable, uninstall, export, publish, or change agents.</p>"
+            '<p><a href="/packages/plan?profile=store-operations">Preview Store operations</a></p>'
+            '<p><a href="/packages/status">View local package status</a></p>'
+            f"<h2>Profiles</h2><ul>{profiles}</ul><h2>Departments</h2><ul>{departments}</ul>"
+        )
+
+    def _package_plan(self, query: dict[str, list[str]]) -> Response:
+        profile_value = _first(query, "profile", "store-operations")
+        profile: str | None = profile_value
+        if profile_value in {"none", "custom", ""}:
+            profile = None
+        departments = tuple(query.get("department", ()))
+        agents = tuple(query.get("agent", ()))
+        try:
+            selection = resolve_selection(profile=profile, departments=departments, agents=agents)
+        except CatalogError as exc:
+            return Response(status=400, body=f"Bad request: {html.escape(str(exc))}")
+
+        package_items = "".join(f"<li>{html.escape(name)}</li>" for name in selection.package_names)
+        distribution_items = "".join(
+            f"<li>{html.escape(distribution)}</li>" for distribution in selection.distributions
+        )
+        return Response(
+            status=200,
+            body=(
+                "<h1>Install Plan</h1>"
+                f"<p>Profile: {html.escape(selection.profile or 'custom')}</p>"
+                f"<h2>Packages</h2><ul>{package_items}</ul>"
+                f"<h2>Distributions</h2><ul>{distribution_items}</ul>"
+            ),
+        )
+
+    def _package_status(self) -> Response:
+        try:
+            status = _manager().status()
+        except InstallStateError as exc:
+            return Response(status=500, body=f"Install state error: {html.escape(str(exc))}")
+        if not status:
+            return Response(status=200, body="<h1>Package Status</h1><p>No packages installed.</p>")
+        rows = "".join(
+            "<tr>"
+            f"<td>{html.escape(package.name)}</td>"
+            f"<td>{html.escape(package.distribution)}</td>"
+            f"<td>{html.escape(package.version)}</td>"
+            f"<td>{'enabled' if package.enabled else 'disabled'}</td>"
+            "</tr>"
+            for package in status.values()
+        )
+        return Response(
+            status=200,
+            body=(
+                "<h1>Package Status</h1>"
+                "<table><thead><tr><th>Name</th><th>Distribution</th>"
+                "<th>Version</th><th>State</th></tr></thead>"
+                f"<tbody>{rows}</tbody></table>"
+            ),
+        )
 
     def _help_index(self) -> str:
         entries = "".join(
             f"<li>{entry['title']} ({entry['audience']})</li>" for entry in self.help_center.index()
         )
         return f"<h1>Help Center</h1><ul>{entries}</ul>"
+
+
+def _manager() -> PackageManager:
+    state_path = os.environ.get("LEMONADE_STATE_PATH")
+    if state_path:
+        return PackageManager(state_path=state_path)
+    return PackageManager()
+
+
+def _first(query: dict[str, list[str]], key: str, default: str) -> str:
+    values = query.get(key)
+    if not values:
+        return default
+    return values[0]
+
+
+def _require_owner_admin(role: str) -> Response | None:
+    if role in {"owner", "admin"}:
+        return None
+    return Response(status=403, body="Forbidden: owner/admin role required")
 
 
 def _title(path: Path) -> str:
