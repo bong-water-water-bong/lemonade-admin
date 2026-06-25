@@ -235,6 +235,7 @@ class AdminApp:
         profile: str | None = profile_value
         if profile_value in {"none", "custom", ""}:
             profile = None
+        key = _first(query, "key", "")
         manager = self.package_manager or _manager()
         try:
             result = manager.install(
@@ -242,6 +243,7 @@ class AdminApp:
                 profile=profile,
                 departments=tuple(query.get("department", ())),
                 agents=tuple(query.get("agent", ())),
+                signature_key_path=key or None,
             )
         except (CatalogError, InstallStateError, ManifestError, ValueError) as exc:
             return Response(status=400, body=f"Install failed: {html.escape(str(exc))}")

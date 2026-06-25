@@ -38,12 +38,13 @@ lemonade-admin --route '/packages/plan?profile=store-operations' --role admin
 Install from a verified local bundle through the internal app route (owner/admin only):
 
 ```text
-POST /packages/install?manifest=/media/usb/lemonade-bundle.toml&profile=store-operations&confirm=install
+POST /packages/install?manifest=/media/usb/lemonade-bundle.toml&profile=store-operations&key=/path/to/bundle.key&confirm=install
 ```
 
 The install route requires `confirm=install` so an owner/admin has to review the
 plan first. It still uses the same offline `lemonade-store` package manager as
-the CLI.
+the CLI. Include `key=/path/to/bundle.key` for signed bundle verification before
+installation.
 
 Run the internal HTTP server on localhost:
 
