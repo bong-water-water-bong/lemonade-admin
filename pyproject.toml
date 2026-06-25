@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Lemonade Store contributors" }]
 dependencies = [
-  "lemonade-store @ git+https://github.com/bong-water-water-bong/lemonade-store@main",
+  "lemonade-store>=0.1.0",
 ]
 
 [project.optional-dependencies]

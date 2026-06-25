@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 from lemonade_store.package_manager import (
     CatalogError,
     InstallStateError,
+    ManifestError,
     PackageManager,
     build_catalog,
     resolve_selection,
@@ -84,15 +85,22 @@ class HelpCenter:
 class AdminApp:
     """Internal admin app shell used by CLI/server adapters."""
 
-    def __init__(self, *, help_center: HelpCenter, policy: AccessPolicy | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        help_center: HelpCenter,
+        policy: AccessPolicy | None = None,
+        package_manager: PackageManager | None = None,
+    ) -> None:
         self.help_center = help_center
         self.policy = policy or AccessPolicy()
+        self.package_manager = package_manager
 
     def handle(self, method: str, path: str, *, host: str, role: str = "owner") -> Response:
         """Handle a minimal internal route."""
         if not self.policy.is_internal_host(host):
             return Response(status=403, body="Forbidden: internal access only")
-        if method != "GET":
+        if method not in {"GET", "POST"}:
             return Response(status=405, body="Method not allowed")
 
         parsed = urlsplit(path)
@@ -116,6 +124,13 @@ class AdminApp:
             if denied is not None:
                 return denied
             return self._package_status()
+        if route == "/packages/install":
+            denied = _require_owner_admin(role)
+            if denied is not None:
+                return denied
+            if method != "POST":
+                return Response(status=405, body="Method not allowed")
+            return self._package_install(query)
         if route == "/backups":
             denied = _require_owner_admin(role)
             if denied is not None:
@@ -204,6 +219,43 @@ class AdminApp:
                 "<table><thead><tr><th>Name</th><th>Distribution</th>"
                 "<th>Version</th><th>State</th></tr></thead>"
                 f"<tbody>{rows}</tbody></table>"
+            ),
+        )
+
+    def _package_install(self, query: dict[str, list[str]]) -> Response:
+        if _first(query, "confirm", "") != "install":
+            return Response(
+                status=400,
+                body="Bad request: add confirm=install after owner/admin review of the install plan.",
+            )
+        manifest = _first(query, "manifest", "")
+        if not manifest:
+            return Response(status=400, body="Bad request: manifest path is required")
+        profile_value = _first(query, "profile", "store-operations")
+        profile: str | None = profile_value
+        if profile_value in {"none", "custom", ""}:
+            profile = None
+        manager = self.package_manager or _manager()
+        try:
+            result = manager.install(
+                manifest_path=manifest,
+                profile=profile,
+                departments=tuple(query.get("department", ())),
+                agents=tuple(query.get("agent", ())),
+            )
+        except (CatalogError, InstallStateError, ManifestError, ValueError) as exc:
+            return Response(status=400, body=f"Install failed: {html.escape(str(exc))}")
+        package_items = "".join(f"<li>{html.escape(name)}</li>" for name in result.package_names)
+        distribution_items = "".join(
+            f"<li>{html.escape(distribution)}</li>" for distribution in result.distributions
+        )
+        return Response(
+            status=200,
+            body=(
+                "<h1>Install Complete</h1>"
+                f"<p>State: {html.escape(str(result.state_path))}</p>"
+                f"<h2>Packages</h2><ul>{package_items}</ul>"
+                f"<h2>Distributions</h2><ul>{distribution_items}</ul>"
             ),
         )
 

@@ -1,6 +1,8 @@
 VENV_PYTHON := .venv/bin/python
 PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
 
+LEMONADE_STORE_PATH ?= ../lemonade-store
+
 .PHONY: all venv install lint type test fmt clean
 
 all: lint type test
@@ -9,6 +11,9 @@ venv:
 	python3 -m venv .venv
 
 install: venv
+	@if [ -d "$(LEMONADE_STORE_PATH)" ]; then \
+		$(VENV_PYTHON) -m pip install -e "$(LEMONADE_STORE_PATH)"; \
+	fi
 	$(VENV_PYTHON) -m pip install -e ".[dev]"
 
 lint:

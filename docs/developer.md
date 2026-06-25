@@ -7,6 +7,13 @@ Developer details are separated from operator/admin help. Maintainers should kee
 - Keep core package resolution, manifests, and install state in `lemonade-store`.
 - Keep internal web routes, Help Center, and role-gated admin UX in `lemonade-admin`.
 - Keep runtime stdlib-only unless a later UI layer explicitly chooses a framework.
+- Keep `lemonade-admin` dependency metadata offline-resolvable (`lemonade-store>=...`), not a GitHub URL.
+
+## Install route
+
+`POST /packages/install` delegates to `PackageManager.install()` and requires
+`confirm=install`. Tests inject a fake package manager runner so install behavior
+is verified without mutating the test environment.
 
 ## Server adapter
 

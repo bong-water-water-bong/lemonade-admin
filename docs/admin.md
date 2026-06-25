@@ -9,10 +9,13 @@ Package installs use the `lemonade-store` package-manager engine.
 - `/packages` lists profiles and departments.
 - `/packages/plan?profile=store-operations` previews a package plan.
 - `/packages/plan?profile=none&department=inventory&agent=onboarder` previews a custom plan.
+- `POST /packages/install?manifest=/media/usb/lemonade-bundle.toml&profile=store-operations&confirm=install` installs after explicit confirmation.
 - `/packages/status` reads local install state.
 - `/backups` lists local backup records from `LEMONADE_BACKUP_DIR` or `~/.lemonade/backups`.
 
-These routes require the `owner` or `admin` role. Attendants are denied.
+These routes require the `owner` or `admin` role. Attendants are denied. The
+install route requires `confirm=install`; owners/admins should preview the plan
+and create a backup before posting to that route.
 
 ## Backup CLI
 

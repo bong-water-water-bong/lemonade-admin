@@ -11,9 +11,15 @@ class _AdminHandler(BaseHTTPRequestHandler):
     app: AdminApp
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        self._handle("GET")
+
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        self._handle("POST")
+
+    def _handle(self, method: str) -> None:
         host = self.headers.get("Host", "127.0.0.1")
         role = self.headers.get("X-Lemonade-Role", "owner")
-        response = self.app.handle("GET", self.path, host=host, role=role)
+        response = self.app.handle(method, self.path, host=host, role=role)
         self.send_response(response.status)
         self.send_header("Content-Type", response.content_type)
         self.send_header("Cache-Control", "no-store")

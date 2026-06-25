@@ -16,6 +16,7 @@ usable internal admin foundation:
 - Help Center routes backed by local Markdown docs
 - package wizard catalog page
 - package install-plan preview route backed by `lemonade-store`
+- owner/admin install route backed by `lemonade-store` package manager
 - package status route backed by local install state
 - simple stdlib HTTP server for internal deployment
 - local backup archive creation/listing/verification primitives
@@ -27,6 +28,22 @@ Preview a route from the CLI:
 ```sh
 lemonade-admin --route /packages/plan?profile=store-operations --role admin
 ```
+
+Preview a package plan:
+
+```sh
+lemonade-admin --route '/packages/plan?profile=store-operations' --role admin
+```
+
+Install from a verified local bundle through the internal app route (owner/admin only):
+
+```text
+POST /packages/install?manifest=/media/usb/lemonade-bundle.toml&profile=store-operations&confirm=install
+```
+
+The install route requires `confirm=install` so an owner/admin has to review the
+plan first. It still uses the same offline `lemonade-store` package manager as
+the CLI.
 
 Run the internal HTTP server on localhost:
 
@@ -43,6 +60,10 @@ lemonade-admin --backup-list --backup-out /media/usb/backups
 
 For LAN use, bind to a private LAN address only. Do not expose this service to a
 public hostname or public interface.
+
+The package depends on `lemonade-store>=0.1.0` as a normal package dependency,
+not a GitHub URL. Offline installs should bundle `lemonade-store` and
+`lemonade-admin` wheels together.
 
 ## Roles
 
