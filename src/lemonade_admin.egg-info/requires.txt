@@ -1,6 +1,0 @@
-lemonade-store @ git+https://github.com/bong-water-water-bong/lemonade-store@main
-
-[dev]
-pytest>=8
-ruff>=0.6
-mypy>=1.10
