@@ -30,3 +30,13 @@ List backup records:
 ```sh
 lemonade-admin --backup-list --backup-out /media/usb/backups
 ```
+
+Verify and restore an archive into a destination directory:
+
+```sh
+lemonade-admin --backup-restore /media/usb/backups/<backup>.tar.gz \
+  --backup-digest sha256:<digest> \
+  --backup-restore-dest ./restore-check
+```
+
+Restore refuses digest mismatches and unsafe archive paths.

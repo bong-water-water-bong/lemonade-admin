@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from lemonade_admin.app import AccessPolicy, AdminApp, HelpCenter
-from lemonade_admin.backup import create_backup, list_backups
+from lemonade_admin.backup import create_backup, list_backups, restore_backup
 from lemonade_admin.server import serve
 
 
@@ -37,6 +37,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Backup output/list directory.",
     )
     parser.add_argument("--backup-label", default="manual", help="Label for --backup-create.")
+    parser.add_argument(
+        "--backup-restore",
+        type=Path,
+        default=None,
+        help="Backup archive to verify and restore, then exit.",
+    )
+    parser.add_argument(
+        "--backup-digest",
+        default="",
+        help="Expected sha256:<digest> for --backup-restore.",
+    )
+    parser.add_argument(
+        "--backup-restore-dest",
+        type=Path,
+        default=Path("restore"),
+        help="Destination directory for --backup-restore.",
+    )
     args = parser.parse_args(argv)
 
     if args.backup_create:
@@ -53,6 +70,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         for record in backups:
             print(f"{record.created_at} {record.label} {record.path} {record.sha256}")
+        return 0
+    if args.backup_restore is not None:
+        if not args.backup_digest:
+            print("error: --backup-digest is required for --backup-restore")
+            return 2
+        restored = restore_backup(
+            args.backup_restore,
+            dest_dir=args.backup_restore_dest,
+            expected_sha256=args.backup_digest,
+        )
+        print(f"restored: {restored}")
         return 0
 
     app = AdminApp(

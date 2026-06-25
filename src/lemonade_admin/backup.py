@@ -79,6 +79,27 @@ def verify_backup(path: Path, *, expected_sha256: str) -> bool:
     return _sha256(path) == expected_sha256
 
 
+def restore_backup(path: Path, *, dest_dir: Path, expected_sha256: str) -> Path:
+    """Verify and extract a backup archive into ``dest_dir``.
+
+    The archive is only extracted after its digest matches. Members are checked
+    for path traversal before extraction so a corrupted/malicious archive cannot
+    write outside ``dest_dir``.
+    """
+    if not verify_backup(path, expected_sha256=expected_sha256):
+        raise BackupError("backup digest mismatch")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_root = dest_dir.resolve()
+    with tarfile.open(path, "r:gz") as tar:
+        members = tar.getmembers()
+        for member in members:
+            target = (dest_root / member.name).resolve()
+            if target != dest_root and dest_root not in target.parents:
+                raise BackupError(f"unsafe archive member {member.name!r}")
+        tar.extractall(dest_root, members=members)
+    return dest_dir
+
+
 def _write_record(record: BackupRecord) -> None:
     data = {
         "label": record.label,

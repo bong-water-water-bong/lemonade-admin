@@ -20,6 +20,7 @@ usable internal admin foundation:
 - package status route backed by local install state
 - simple stdlib HTTP server for internal deployment
 - local backup archive creation/listing/verification primitives
+- verified backup restore CLI with digest and path-traversal checks
 
 ## Run locally
 
@@ -52,12 +53,18 @@ Run the internal HTTP server on localhost:
 lemonade-admin --serve --host 127.0.0.1 --port 8788
 ```
 
-Create and list a local backup:
+Create, list, and restore a local backup:
 
 ```sh
 lemonade-admin --backup-create --backup-path ~/.lemonade --backup-out /media/usb/backups --backup-label pre-install
 lemonade-admin --backup-list --backup-out /media/usb/backups
+lemonade-admin --backup-restore /media/usb/backups/<backup>.tar.gz \
+  --backup-digest sha256:<digest> \
+  --backup-restore-dest ./restore-check
 ```
+
+Restore verifies the archive digest before extraction and rejects unsafe archive
+members that try to write outside the destination directory.
 
 For LAN use, bind to a private LAN address only. Do not expose this service to a
 public hostname or public interface.

@@ -9,6 +9,12 @@ Developer details are separated from operator/admin help. Maintainers should kee
 - Keep runtime stdlib-only unless a later UI layer explicitly chooses a framework.
 - Keep `lemonade-admin` dependency metadata offline-resolvable (`lemonade-store>=...`), not a GitHub URL.
 
+## Backup and restore
+
+`lemonade_admin.backup.restore_backup()` verifies the expected `sha256:<digest>`
+before extraction and rejects archive members that would escape the restore
+destination. Keep restore as an owner/admin recovery action.
+
 ## Install route
 
 `POST /packages/install` delegates to `PackageManager.install()` and requires
