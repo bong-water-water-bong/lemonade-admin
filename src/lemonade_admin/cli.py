@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from lemonade_admin.app import AccessPolicy, AdminApp, HelpCenter
-from lemonade_admin.backup import create_backup, list_backups, restore_backup
+from lemonade_admin.backup import BackupError, create_backup, list_backups, restore_backup
 from lemonade_admin.server import serve
 
 
@@ -56,6 +57,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    try:
+        return _run(args)
+    except BackupError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+def _run(args: argparse.Namespace) -> int:
     if args.backup_create:
         record = create_backup(
             paths=tuple(args.backup_path), out_dir=args.backup_out, label=args.backup_label
