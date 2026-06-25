@@ -1,0 +1,2 @@
+[console_scripts]
+lemonade-admin = lemonade_admin.cli:main
