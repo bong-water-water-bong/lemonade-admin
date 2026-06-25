@@ -18,6 +18,7 @@ usable internal admin foundation:
 - package install-plan preview route backed by `lemonade-store`
 - package status route backed by local install state
 - simple stdlib HTTP server for internal deployment
+- local backup archive creation/listing/verification primitives
 
 ## Run locally
 
@@ -31,6 +32,13 @@ Run the internal HTTP server on localhost:
 
 ```sh
 lemonade-admin --serve --host 127.0.0.1 --port 8788
+```
+
+Create and list a local backup:
+
+```sh
+lemonade-admin --backup-create --backup-path ~/.lemonade --backup-out /media/usb/backups --backup-label pre-install
+lemonade-admin --backup-list --backup-out /media/usb/backups
 ```
 
 For LAN use, bind to a private LAN address only. Do not expose this service to a

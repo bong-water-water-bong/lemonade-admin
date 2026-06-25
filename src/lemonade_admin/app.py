@@ -22,6 +22,8 @@ from lemonade_store.package_manager import (
     resolve_selection,
 )
 
+from lemonade_admin.backup import list_backups
+
 
 @dataclass(frozen=True)
 class Response:
@@ -114,6 +116,11 @@ class AdminApp:
             if denied is not None:
                 return denied
             return self._package_status()
+        if route == "/backups":
+            denied = _require_owner_admin(role)
+            if denied is not None:
+                return denied
+            return self._backups()
         if route == "/help":
             return Response(status=200, body=self._help_index())
         if route.startswith("/help/"):
@@ -196,6 +203,32 @@ class AdminApp:
                 "<h1>Package Status</h1>"
                 "<table><thead><tr><th>Name</th><th>Distribution</th>"
                 "<th>Version</th><th>State</th></tr></thead>"
+                f"<tbody>{rows}</tbody></table>"
+            ),
+        )
+
+    def _backups(self) -> Response:
+        backup_dir = Path(
+            os.environ.get("LEMONADE_BACKUP_DIR", str(Path.home() / ".lemonade" / "backups"))
+        )
+        backups = list_backups(backup_dir)
+        if not backups:
+            return Response(status=200, body="<h1>Backups</h1><p>No local backups found.</p>")
+        rows = "".join(
+            "<tr>"
+            f"<td>{html.escape(record.label)}</td>"
+            f"<td>{html.escape(record.created_at)}</td>"
+            f"<td>{html.escape(str(record.path))}</td>"
+            f"<td>{html.escape(record.sha256)}</td>"
+            "</tr>"
+            for record in backups
+        )
+        return Response(
+            status=200,
+            body=(
+                "<h1>Backups</h1>"
+                "<table><thead><tr><th>Label</th><th>Created</th>"
+                "<th>Path</th><th>SHA-256</th></tr></thead>"
                 f"<tbody>{rows}</tbody></table>"
             ),
         )
